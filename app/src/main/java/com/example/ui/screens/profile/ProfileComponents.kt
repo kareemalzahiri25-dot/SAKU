@@ -2,6 +2,7 @@ package com.example.ui.screens.profile
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -197,7 +198,7 @@ fun FinancialStatsCard(
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 StatItem(
-                    label = "Total Asset",
+                    label = "Total Aset",
                     value = Formatters.formatRupiah(summary.totalAssetBalance),
                     color = SakuDarkGreen
                 )
@@ -270,17 +271,17 @@ fun AccountSection(
         )
         AccountMenuItem(
             icon = Icons.Default.Settings,
-            title = "Backup Data",
+            title = "Cadangan Data",
             subtitle = "Ekspor dan cadangkan data",
             actionIcon = Icons.Default.ArrowForward,
-            onClick = { onShowSnackbar("Backup Data") }
+            onClick = { onShowSnackbar("Cadangan Data") }
         )
         AccountMenuItem(
             icon = Icons.Default.Fingerprint,
-            title = "Biometric",
-            subtitle = "Aktifkan login sidik jari",
+            title = "Biometrik",
+            subtitle = "Aktifkan autentikasi sidik jari",
             actionIcon = null,
-            onClick = { onShowSnackbar("Biometric") },
+            onClick = { onShowSnackbar("Biometrik") },
             trailing = {
                 Switch(
                     checked = false,
@@ -612,21 +613,25 @@ fun BackupDialog(
                         contentColor = Color.White
                     )
                 ) {
-                    Text("Ekspor CSV/JSON")
+                    Text("Ekspor CSV/JSON", color = Color.White)
                 }
                 OutlinedButton(
                     onClick = onBackupLocal,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, SakuDarkGreen),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SakuDarkGreen)
                 ) {
-                    Text("Backup Lokal")
+                    Text("Cadangan Lokal", color = SakuDarkGreen)
                 }
                 OutlinedButton(
                     onClick = onBackupDrive,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, SakuDarkGreen),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SakuDarkGreen)
                 ) {
-                    Text("Backup ke Google Drive")
+                    Text("Cadangan ke Google Drive", color = SakuDarkGreen)
                 }
             }
         },

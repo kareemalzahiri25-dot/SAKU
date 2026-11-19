@@ -291,12 +291,12 @@ fun PeriodFilterSection(
                         contentColor = Color.White
                     )
                 ) {
-                    Text("Pilih")
+                    Text("Pilih", color = Color.White)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showRangePicker = false }) {
-                    Text("Batal", color = SakuTextMuted)
+                    Text("Batal", color = SakuTextSecondary)
                 }
             },
             colors = androidx.compose.material3.DatePickerDefaults.colors(

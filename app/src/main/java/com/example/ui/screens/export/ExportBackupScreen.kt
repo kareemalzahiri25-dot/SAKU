@@ -1,6 +1,7 @@
 package com.example.ui.screens.export
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -367,6 +368,8 @@ fun ExportBackupScreen(
                             OutlinedButton(
                                 onClick = { viewModel.restoreFromJson() },
                                 shape = RoundedCornerShape(12.dp),
+                                border = BorderStroke(1.dp, SakuDarkGreen),
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = SakuDarkGreen),
                                 modifier = Modifier.fillMaxWidth().height(46.dp).testTag("restore_submit_button"),
                                 enabled = !uiState.isExporting
                             ) {

@@ -338,9 +338,11 @@ fun TransferSheet(
                 OutlinedButton(
                     onClick = onDismiss,
                     modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, SakuDarkGreen),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = SakuDarkGreen)
                 ) {
-                    Text("Batal", color = SakuTextPrimary)
+                    Text("Batal", color = SakuDarkGreen)
                 }
                 Button(
                     onClick = onSave,

@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -265,7 +266,8 @@ fun AddTransactionScreen(
                 ) {
                     Text(
                         text = "Simpan Transaksi",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = if (isFormValid) Color.White else SakuTextMuted
                     )
                 }
             }
@@ -1114,7 +1116,7 @@ fun AddTransactionScreen(
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.testTag("api_key_missing_profile_button")
                     ) {
-                        Text("Atur di Profil")
+                        Text("Atur di Profil", color = Color.White)
                     }
                 },
                 dismissButton = {
@@ -1124,6 +1126,8 @@ fun AddTransactionScreen(
                             proceedWithChosenSource()
                         },
                         shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, SakuDarkGreen),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SakuDarkGreen),
                         modifier = Modifier.testTag("api_key_missing_ocr_button")
                     ) {
                         Text("Gunakan OCR Biasa", color = SakuDarkGreen)
@@ -1172,7 +1176,7 @@ fun AddTransactionScreen(
                         ),
                         shape = RoundedCornerShape(12.dp)
                     ) {
-                        Text("Pilih dari Galeri")
+                        Text("Pilih dari Galeri", color = Color.White)
                     }
                 },
                 dismissButton = {
@@ -1263,7 +1267,7 @@ fun AddTransactionScreen(
                             ),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("Lanjutkan", style = MaterialTheme.typography.titleMedium)
+                            Text("Lanjutkan", style = MaterialTheme.typography.titleMedium, color = Color.White)
                         }
                     }
                 }
@@ -1308,7 +1312,7 @@ fun AddTransactionScreen(
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.testTag("scan_retry_button")
                         ) {
-                            Text("Coba Lagi")
+                            Text("Coba Lagi", color = Color.White)
                         }
                     }
                 },

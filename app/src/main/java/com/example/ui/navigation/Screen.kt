@@ -44,7 +44,7 @@ sealed class BottomNavItem(
 
     object Kantong : BottomNavItem(
         route = Screen.Kantong.route,
-        label = "Saku",
+        label = "Kantong",
         selectedIcon = Icons.Filled.AccountBalanceWallet,
         unselectedIcon = Icons.Outlined.AccountBalanceWallet
     )
