@@ -27,10 +27,11 @@ val state: StateFlow<UiState> = _state.asStateFlow()
 - Uses Screen sealed class for route definitions
 - SakuNavHost for host with container parameter
 
-## Theme System
+## Theme System & Design Guidelines
 - Material 3 as foundation
 - Custom color constants (SakuDarkGreen, SakuCreamBackground, etc.)
 - Component theme integration via MyApplicationTheme
+- Full design system, tokens, typography scale, and UX rules: refer to `DESIGN.md` at root
 
 ## File Structure
 - Consistent two-level package depth (com.example.*)
