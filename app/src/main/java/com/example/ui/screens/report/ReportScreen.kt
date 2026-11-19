@@ -404,7 +404,8 @@ fun SummaryMetricCard(
                 Text(
                     text = title,
                     style = MaterialTheme.typography.labelMedium,
-                    color = SakuTextSecondary
+                    color = SakuTextSecondary,
+                    modifier = Modifier.weight(1f)
                 )
                 Box(
                     modifier = Modifier
@@ -435,7 +436,9 @@ fun SummaryMetricCard(
                 Text(
                     text = Formatters.formatRupiah(amount),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = SakuTextPrimary
+                    color = SakuTextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 if (isIncome != null) {
@@ -563,7 +566,7 @@ fun CashflowLineChartSection(points: List<CashflowPoint>) {
                         modifier = Modifier
                             .align(Alignment.CenterStart)
                             .fillMaxHeight()
-                            .padding(start = 4.dp, top = 20.dp, bottom = 20.dp),
+                            .padding(start = 12.dp, top = 20.dp, bottom = 20.dp),
                         verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(

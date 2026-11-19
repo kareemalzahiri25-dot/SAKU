@@ -192,7 +192,7 @@ fun ExportBackupScreen(
                             ) {
                                 Icon(imageVector = Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Buat & Unduh Berkas CSV", fontWeight = FontWeight.SemiBold)
+                                Text("Buat & Unduh Berkas CSV", fontWeight = FontWeight.SemiBold, color = Color.White)
                             }
 
                             if (uiState.exportedCsv != null) {
@@ -258,7 +258,7 @@ fun ExportBackupScreen(
                             ) {
                                 Icon(imageVector = Icons.Default.FileDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Buat & Unduh Berkas XLSX", fontWeight = FontWeight.SemiBold)
+                                Text("Buat & Unduh Berkas XLSX", fontWeight = FontWeight.SemiBold, color = Color.White)
                             }
                         }
                     }
@@ -299,7 +299,7 @@ fun ExportBackupScreen(
                             ) {
                                 Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("Buat Berkas Cadangan JSON", fontWeight = FontWeight.SemiBold)
+                                Text("Buat Berkas Cadangan JSON", fontWeight = FontWeight.SemiBold, color = Color.White)
                             }
 
                             if (uiState.exportedJson != null) {

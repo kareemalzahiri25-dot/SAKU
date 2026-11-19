@@ -137,7 +137,8 @@ fun AuthPrimaryButton(
         } else {
             Text(
                 text = text,
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = Color.White
             )
         }
     }

@@ -179,7 +179,7 @@ fun InformasiPribadiScreen(
                                 contentColor = Color.White
                             )
                         ) {
-                            Text("Simpan")
+                            Text("Simpan", color = Color.White)
                         }
                     },
                     dismissButton = {
@@ -609,7 +609,7 @@ fun ApiKeyConfigurationSection(
                     contentColor = Color.White
                 )
             ) {
-                Text("Simpan")
+                Text("Simpan", color = Color.White)
             }
 
             OutlinedButton(
@@ -617,7 +617,8 @@ fun ApiKeyConfigurationSection(
                 enabled = hasSavedKey,
                 modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(12.dp),
-                border = BorderStroke(1.dp, if (hasSavedKey) SakuDarkGreen else SakuTextMuted)
+                border = BorderStroke(1.dp, if (hasSavedKey) SakuDarkGreen else SakuTextMuted),
+                colors = ButtonDefaults.outlinedButtonColors(contentColor = SakuDarkGreen)
             ) {
                 Text("Uji Koneksi")
             }

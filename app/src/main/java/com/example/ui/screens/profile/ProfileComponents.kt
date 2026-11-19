@@ -529,7 +529,8 @@ fun LogoutButton(
             text = "Keluar Akun",
             style = MaterialTheme.typography.bodyMedium.copy(
                 fontWeight = FontWeight.Medium
-            )
+            ),
+            color = Color.White
         )
     }
 }
