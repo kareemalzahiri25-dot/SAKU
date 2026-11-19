@@ -39,6 +39,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.TrendingUp
+import androidx.compose.material.icons.automirrored.filled.ViewList
 import androidx.compose.material.icons.filled.AccountBalance
 import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material.icons.filled.Add
@@ -70,6 +71,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -111,6 +113,8 @@ import com.example.domain.model.AssetType
 import com.example.domain.model.Pocket
 import com.example.domain.model.PocketStats
 import com.example.ui.components.SakuCard
+import com.example.ui.components.SakuTopBar
+import kotlin.math.roundToInt
 import com.example.ui.theme.SakuCreamBackground
 import com.example.ui.theme.SakuCreamBorder
 import com.example.ui.theme.SakuCreamSurface
@@ -121,6 +125,7 @@ import com.example.ui.theme.SakuExpenseRed
 import com.example.ui.theme.SakuForestGreen
 import com.example.ui.theme.SakuGoldAccent
 import com.example.ui.theme.SakuGoldLight
+import com.example.ui.theme.SakuIncomeGreen
 import com.example.ui.theme.SakuLightGreen
 import com.example.ui.theme.SakuMediumGreen
 import com.example.ui.theme.SakuSageAccent
@@ -318,44 +323,27 @@ fun KantongScreen(
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
     val totalAllocated = pocketStats.sumOf { it.realization }
+    val totalTarget = pockets.sumOf { it.targetAmount }
     val activeAssetCount = activeAssets.size
+    val totalPlanned = assetPlanning.values.sum()
+    val availableBalance = totalAssetBalance - totalPlanned
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(SakuCreamBackground)
-            .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 100.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 100.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // 1. Screen Header (Dynamic based on selected tab)
+            // 1. Screen Header (SakuTopBar)
             item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column {
-                        Text(
-                            text = if (uiState.selectedTab == SakuPageTab.ASET) "Aset" else "Kantong Dana",
-                            style = MaterialTheme.typography.headlineSmall.copy(
-                                fontWeight = FontWeight.ExtraBold,
-                                color = SakuDarkGreen
-                            )
-                        )
-                        Text(
-                            text = if (uiState.selectedTab == SakuPageTab.ASET) {
-                                "Kelola rekening dan tempat penyimpanan uang Anda"
-                            } else {
-                                "Bagi dan alokasikan anggaran sesuai pos keuangan"
-                            },
-                            style = MaterialTheme.typography.bodySmall.copy(color = SakuTextSecondary)
-                        )
-                    }
-                }
+                SakuTopBar(
+                    title = "Kantong & Aset",
+                    canNavigateBack = false
+                )
             }
 
             // 2. Tab Switcher (Kantong Dana | Aset)
@@ -369,260 +357,40 @@ fun KantongScreen(
             if (uiState.selectedTab == SakuPageTab.KANTONG) {
                 // ==================== TAB KANTONG DANA ====================
 
-                // Total Overview Card
+                // 3. Pocket Budget Overview Card (Clean Light Card Design)
                 item {
-                    Card(
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = SakuDarkGreen),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(SakuDarkGreen, SakuMediumGreen, SakuDarkGreenDeep)
-                                    )
-                                )
-                                .padding(20.dp)
-                        ) {
-                            Column {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Total Seluruh Kantong",
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            color = Color.White.copy(alpha = 0.8f)
-                                        )
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Color.White.copy(alpha = 0.18f)
-                                    ) {
-                                        Text(
-                                            text = "${pockets.size} Pos Aktif",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                color = Color.White,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 11.sp
-                                            ),
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                Text(
-                                    text = Formatters.formatRupiah(totalAllocated),
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color.White
-                                    )
-                                )
-                            }
-                        }
-                    }
+                    PocketBudgetOverviewCard(
+                        totalAllocated = totalAllocated,
+                        totalTarget = totalTarget,
+                        pocketCount = pockets.size,
+                        onAddPocket = { viewModel.openAddPocketDialog() }
+                    )
                 }
 
-                // Action Cards (Buat Kantong Baru)
+                // 4. Rekomendasi Kantong Cepat (Horizontal Quick Chips)
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        SakuCard(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { viewModel.openAddPocketDialog() }
-                                .testTag("add_pocket_button"),
-                            backgroundColor = SakuCreamSurface,
-                            borderColor = SakuCreamBorder,
-                            cornerRadius = 18.dp,
-                            elevation = 2.dp
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(RoundedCornerShape(11.dp))
-                                        .background(SakuLightGreen),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = null,
-                                        tint = SakuDarkGreen,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "Buat Kantong",
-                                        style = MaterialTheme.typography.labelLarge.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = SakuDarkGreen
-                                        )
-                                    )
-                                    Text(
-                                        text = "Pos baru",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            color = SakuTextSecondary,
-                                            fontSize = 11.sp
-                                        )
-                                    )
-                                }
-                            }
+                    QuickRecommendedPocketsSection(
+                        onSelectRecommendation = { rec ->
+                            viewModel.openAddPocketDialog(
+                                presetName = rec.name,
+                                presetTarget = rec.target,
+                                presetType = rec.type,
+                                presetIcon = rec.iconName,
+                                presetColor = rec.colorHex
+                            )
                         }
-                    }
+                    )
                 }
 
-                // Rekomendasi Kantong (Horizontal Recommendation Chips)
+                // 5. Section Header with View Mode Switcher
                 item {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = "Rekomendasi Kantong",
-                                style = MaterialTheme.typography.titleSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = SakuDarkGreen
-                                )
-                            )
-                            Text(
-                                text = "Ketuk untuk buat cepat",
-                                style = MaterialTheme.typography.labelSmall.copy(color = SakuTextMuted, fontSize = 11.sp)
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(10.dp))
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            RECOMMENDED_POCKETS.forEach { rec ->
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = SakuCreamSurface,
-                                    border = BorderStroke(1.dp, SakuCreamBorder),
-                                    shadowElevation = 1.dp,
-                                    modifier = Modifier.clickable {
-                                        viewModel.openAddPocketDialog(
-                                            presetName = rec.name,
-                                            presetTarget = rec.target,
-                                            presetType = rec.type,
-                                            presetIcon = rec.iconName,
-                                            presetColor = rec.colorHex
-                                        )
-                                    }
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(text = rec.emoji, fontSize = 14.sp)
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text(
-                                            text = rec.name,
-                                            style = MaterialTheme.typography.labelMedium.copy(
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = SakuDarkGreen
-                                            )
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Section Header with View Mode Switcher
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Daftar Kantong",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = SakuDarkGreen
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = CircleShape,
-                                color = SakuLightGreen
-                            ) {
-                                Text(
-                                    text = "${pockets.size}",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = SakuDarkGreen,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-
-                        // View Switcher (Grid vs List)
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = SakuCreamSurfaceVariant,
-                            border = BorderStroke(1.dp, SakuCreamBorder)
-                        ) {
-                            Row(modifier = Modifier.padding(2.dp)) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (uiState.viewMode == KantongViewMode.GRID) SakuDarkGreen else Color.Transparent,
-                                    modifier = Modifier.clickable { viewModel.setViewMode(KantongViewMode.GRID) }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.GridView,
-                                        contentDescription = "Tampilan Grid 2 Kolom",
-                                        tint = if (uiState.viewMode == KantongViewMode.GRID) Color.White else SakuTextSecondary,
-                                        modifier = Modifier
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            .size(18.dp)
-                                    )
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (uiState.viewMode == KantongViewMode.LIST) SakuDarkGreen else Color.Transparent,
-                                    modifier = Modifier.clickable { viewModel.setViewMode(KantongViewMode.LIST) }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ViewList,
-                                        contentDescription = "Tampilan Daftar Detail",
-                                        tint = if (uiState.viewMode == KantongViewMode.LIST) Color.White else SakuTextSecondary,
-                                        modifier = Modifier
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            .size(18.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    SectionHeaderWithViewMode(
+                        title = "Daftar Kantong",
+                        count = pockets.size,
+                        isGrid = uiState.viewMode == KantongViewMode.GRID,
+                        onSetGrid = { viewModel.setViewMode(KantongViewMode.GRID) },
+                        onSetList = { viewModel.setViewMode(KantongViewMode.LIST) }
+                    )
                 }
 
                 // Content: 2-Column Compact Grid OR Detailed List Cards
@@ -665,245 +433,27 @@ fun KantongScreen(
             } else {
                 // ==================== TAB ASET ====================
 
-                // Asset Overview Card
+                // 3. Asset Liquidity Overview Card (Clean Light Card Design)
                 item {
-                    Card(
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = SakuDarkGreen),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(
-                                    Brush.linearGradient(
-                                        colors = listOf(SakuDarkGreen, SakuMediumGreen, SakuDarkGreenDeep)
-                                    )
-                                )
-                                .padding(20.dp)
-                        ) {
-                            Column {
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "Total Saldo Aset",
-                                        style = MaterialTheme.typography.labelMedium.copy(
-                                            color = Color.White.copy(alpha = 0.8f)
-                                        )
-                                    )
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = Color.White.copy(alpha = 0.18f)
-                                    ) {
-                                        Text(
-                                            text = "$activeAssetCount Akun Aktif",
-                                            style = MaterialTheme.typography.labelSmall.copy(
-                                                color = Color.White,
-                                                fontWeight = FontWeight.SemiBold,
-                                                fontSize = 11.sp
-                                            ),
-                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                        )
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.height(6.dp))
-
-                                Text(
-                                    text = Formatters.formatRupiah(totalAssetBalance),
-                                    style = MaterialTheme.typography.headlineMedium.copy(
-                                        fontWeight = FontWeight.ExtraBold,
-                                        color = Color.White
-                                    )
-                                )
-                            }
-                        }
-                    }
+                    AssetLiquidityOverviewCard(
+                        totalAssetBalance = totalAssetBalance,
+                        totalPlanned = totalPlanned,
+                        availableBalance = availableBalance,
+                        activeAssetCount = activeAssetCount,
+                        onAddAsset = { viewModel.openAddAssetDialog() },
+                        onTransfer = { viewModel.openTransferSheet() }
+                    )
                 }
 
-                // Action Card (Tambah Aset Baru + Transfer)
+                // 4. Section Header with View Mode Switcher
                 item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        SakuCard(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { viewModel.openAddAssetDialog() }
-                                .testTag("add_asset_button"),
-                            backgroundColor = SakuCreamSurface,
-                            borderColor = SakuCreamBorder,
-                            cornerRadius = 18.dp,
-                            elevation = 2.dp
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(RoundedCornerShape(11.dp))
-                                        .background(SakuLightGreen),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Add,
-                                        contentDescription = null,
-                                        tint = SakuDarkGreen,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "Tambah Aset",
-                                        style = MaterialTheme.typography.labelLarge.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = SakuDarkGreen
-                                        )
-                                    )
-                                    Text(
-                                        text = "Rekening / Dompet Baru",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            color = SakuTextSecondary,
-                                            fontSize = 11.sp
-                                        )
-                                    )
-                                }
-                            }
-                        }
-
-                        SakuCard(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { viewModel.openTransferSheet() }
-                                .testTag("transfer_button"),
-                            backgroundColor = SakuCreamSurface,
-                            borderColor = SakuCreamBorder,
-                            cornerRadius = 18.dp,
-                            elevation = 2.dp
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(14.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(38.dp)
-                                        .clip(RoundedCornerShape(11.dp))
-                                        .background(SakuLightGreen),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.SwapHoriz,
-                                        contentDescription = null,
-                                        tint = SakuDarkGreen,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Column {
-                                    Text(
-                                        text = "Transfer",
-                                        style = MaterialTheme.typography.labelLarge.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            color = SakuDarkGreen
-                                        )
-                                    )
-                                    Text(
-                                        text = "Pindahkan Dana",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            color = SakuTextSecondary,
-                                            fontSize = 11.sp
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-
-                // Section Header with View Mode Switcher
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = "Daftar Aset",
-                                style = MaterialTheme.typography.titleMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = SakuDarkGreen
-                                )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Surface(
-                                shape = CircleShape,
-                                color = SakuLightGreen
-                            ) {
-                                Text(
-                                    text = "$activeAssetCount",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        color = SakuDarkGreen,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 11.sp
-                                    ),
-                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
-                                )
-                            }
-                        }
-
-                        // View Switcher (Grid vs List)
-                        Surface(
-                            shape = RoundedCornerShape(10.dp),
-                            color = SakuCreamSurfaceVariant,
-                            border = BorderStroke(1.dp, SakuCreamBorder)
-                        ) {
-                            Row(modifier = Modifier.padding(2.dp)) {
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (uiState.assetViewMode == AssetViewMode.GRID) SakuDarkGreen else Color.Transparent,
-                                    modifier = Modifier.clickable { viewModel.setAssetViewMode(AssetViewMode.GRID) }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.GridView,
-                                        contentDescription = "Tampilan Grid 2 Kolom",
-                                        tint = if (uiState.assetViewMode == AssetViewMode.GRID) Color.White else SakuTextSecondary,
-                                        modifier = Modifier
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            .size(18.dp)
-                                    )
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(8.dp),
-                                    color = if (uiState.assetViewMode == AssetViewMode.LIST) SakuDarkGreen else Color.Transparent,
-                                    modifier = Modifier.clickable { viewModel.setAssetViewMode(AssetViewMode.LIST) }
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.ViewList,
-                                        contentDescription = "Tampilan Daftar Detail",
-                                        tint = if (uiState.assetViewMode == AssetViewMode.LIST) Color.White else SakuTextSecondary,
-                                        modifier = Modifier
-                                            .padding(horizontal = 8.dp, vertical = 4.dp)
-                                            .size(18.dp)
-                                    )
-                                }
-                            }
-                        }
-                    }
+                    SectionHeaderWithViewMode(
+                        title = "Daftar Aset",
+                        count = activeAssetCount,
+                        isGrid = uiState.assetViewMode == AssetViewMode.GRID,
+                        onSetGrid = { viewModel.setAssetViewMode(AssetViewMode.GRID) },
+                        onSetList = { viewModel.setAssetViewMode(AssetViewMode.LIST) }
+                    )
                 }
 
                 // Banner Over-Planning
@@ -1052,6 +602,463 @@ fun KantongScreen(
             )
         }
 
+    }
+}
+
+// ==================== POCKET BUDGET OVERVIEW CARD ====================
+@Composable
+fun PocketBudgetOverviewCard(
+    totalAllocated: Double,
+    totalTarget: Double,
+    pocketCount: Int,
+    onAddPocket: () -> Unit
+) {
+    val overallProgress = if (totalTarget > 0.0) ((totalAllocated / totalTarget) * 100.0).roundToInt().coerceIn(0, 100) else 0
+    val progressRatio = if (totalTarget > 0.0) (totalAllocated / totalTarget).toFloat().coerceIn(0f, 1f) else 0f
+
+    SakuCard(
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = SakuCreamSurface,
+        cornerRadius = 18.dp,
+        elevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Header Row: Total Realisasi & Target Anggaran
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
+                    Text(
+                        text = "Total Realisasi Pos",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SakuTextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = Formatters.formatRupiah(totalAllocated),
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        color = SakuTextPrimary
+                    )
+                }
+
+                if (totalTarget > 0) {
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Target Anggaran",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SakuTextMuted
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = Formatters.formatRupiah(totalTarget),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = SakuDarkGreen
+                        )
+                    }
+                }
+            }
+
+            // Progress Bar
+            if (totalTarget > 0) {
+                Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(6.dp)
+                            .clip(RoundedCornerShape(3.dp))
+                            .background(SakuLightGreen)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(progressRatio)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(SakuDarkGreen)
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "$overallProgress% terpakai",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = SakuDarkGreen
+                            )
+                        )
+                        val remaining = (totalTarget - totalAllocated).coerceAtLeast(0.0)
+                        Text(
+                            text = "Sisa ${Formatters.formatRupiah(remaining)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SakuTextMuted
+                        )
+                    }
+                }
+            } else {
+                HorizontalDivider(
+                    color = SakuCreamBorder.copy(alpha = 0.6f),
+                    thickness = 1.dp
+                )
+            }
+
+            // Bottom Info & Action
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SakuCreamBackground,
+                    border = BorderStroke(1.dp, SakuCreamBorder)
+                ) {
+                    Text(
+                        text = "$pocketCount Pos Aktif",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = SakuTextSecondary
+                        ),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+
+                Button(
+                    onClick = onAddPocket,
+                    modifier = Modifier.testTag("add_pocket_button"),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SakuDarkGreen,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Buat Kantong",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ==================== ASSET LIQUIDITY OVERVIEW CARD ====================
+@Composable
+fun AssetLiquidityOverviewCard(
+    totalAssetBalance: Double,
+    totalPlanned: Double,
+    availableBalance: Double,
+    activeAssetCount: Int,
+    onAddAsset: () -> Unit,
+    onTransfer: () -> Unit
+) {
+    SakuCard(
+        modifier = Modifier.fillMaxWidth(),
+        backgroundColor = SakuCreamSurface,
+        cornerRadius = 18.dp,
+        elevation = 2.dp
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            // Top Row: Total Saldo Aset & Badge Akun
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column {
+                    Text(
+                        text = "Total Saldo Aset",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = SakuTextSecondary
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = Formatters.formatRupiah(totalAssetBalance),
+                        style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold),
+                        color = SakuTextPrimary
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = SakuCreamBackground,
+                    border = BorderStroke(1.dp, SakuCreamBorder)
+                ) {
+                    Text(
+                        text = "$activeAssetCount Akun Aktif",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.SemiBold,
+                            color = SakuTextSecondary
+                        ),
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
+                }
+            }
+
+            // Middle: Liquidity Breakdown (Terikat Rencana vs Saldo Bebas)
+            Surface(
+                shape = RoundedCornerShape(10.dp),
+                color = SakuCreamBackground,
+                border = BorderStroke(1.dp, SakuCreamBorder),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "Terikat Rencana",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SakuTextMuted
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = Formatters.formatRupiah(totalPlanned),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                            color = SakuGoldAccent
+                        )
+                    }
+
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            text = "Saldo Bebas (Tersedia)",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = SakuTextMuted
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = Formatters.formatRupiah(availableBalance),
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = if (availableBalance >= 0) SakuIncomeGreen else SakuExpenseRed
+                        )
+                    }
+                }
+            }
+
+            // Bottom Row: 2 Action Buttons (Tambah Aset & Transfer)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onAddAsset,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("add_asset_button"),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = SakuDarkGreen,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(vertical = 10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = Color.White
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Tambah Aset",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = Color.White
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = onTransfer,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("transfer_button"),
+                    border = BorderStroke(1.dp, SakuDarkGreen),
+                    shape = RoundedCornerShape(12.dp),
+                    contentPadding = PaddingValues(vertical = 10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.SwapHoriz,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp),
+                        tint = SakuDarkGreen
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Transfer",
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                        color = SakuDarkGreen
+                    )
+                }
+            }
+        }
+    }
+}
+
+// ==================== QUICK RECOMMENDED POCKETS ====================
+@Composable
+fun QuickRecommendedPocketsSection(
+    onSelectRecommendation: (RecommendedPocket) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Rekomendasi Cepat",
+                style = MaterialTheme.typography.labelMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = SakuDarkGreen
+                )
+            )
+            Text(
+                text = "Ketuk untuk buat cepat",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    color = SakuTextMuted,
+                    fontSize = 11.sp
+                )
+            )
+        }
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            RECOMMENDED_POCKETS.forEach { rec ->
+                Surface(
+                    shape = RoundedCornerShape(20.dp),
+                    color = SakuCreamSurface,
+                    border = BorderStroke(1.dp, SakuCreamBorder),
+                    shadowElevation = 1.dp,
+                    modifier = Modifier.clickable { onSelectRecommendation(rec) }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(text = rec.emoji, fontSize = 13.sp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = rec.name,
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = SakuDarkGreen
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ==================== SECTION HEADER WITH VIEW MODE ====================
+@Composable
+fun SectionHeaderWithViewMode(
+    title: String,
+    count: Int,
+    isGrid: Boolean,
+    onSetGrid: () -> Unit,
+    onSetList: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = SakuDarkGreen
+                )
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Surface(
+                shape = CircleShape,
+                color = SakuLightGreen
+            ) {
+                Text(
+                    text = "$count",
+                    style = MaterialTheme.typography.labelSmall.copy(
+                        color = SakuDarkGreen,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    ),
+                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp)
+                )
+            }
+        }
+
+        // View Switcher (Grid vs List)
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = SakuCreamSurfaceVariant,
+            border = BorderStroke(1.dp, SakuCreamBorder)
+        ) {
+            Row(modifier = Modifier.padding(2.dp)) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (isGrid) SakuDarkGreen else Color.Transparent,
+                    modifier = Modifier.clickable { onSetGrid() }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.GridView,
+                        contentDescription = "Tampilan Grid 2 Kolom",
+                        tint = if (isGrid) Color.White else SakuTextSecondary,
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .size(18.dp)
+                    )
+                }
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = if (!isGrid) SakuDarkGreen else Color.Transparent,
+                    modifier = Modifier.clickable { onSetList() }
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ViewList,
+                        contentDescription = "Tampilan Daftar Detail",
+                        tint = if (!isGrid) Color.White else SakuTextSecondary,
+                        modifier = Modifier
+                            .padding(horizontal = 8.dp, vertical = 4.dp)
+                            .size(18.dp)
+                    )
+                }
+            }
+        }
     }
 }
 

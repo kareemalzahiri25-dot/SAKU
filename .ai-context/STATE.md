@@ -22,8 +22,8 @@
 - **Min SDK**: Not specified (assumed)
 
 ## Current Modifications
-- **Modified**: SAKU_DECISIONS.md, SAKU_PROGRESS.md, SAKU_PROJECT_CONTEXT.md
-- **Status**: All changes staged/unstaged (git status shows modifications)
+- **Modified**: ReportScreen.kt, ReportViewModel.kt, KantongScreen.kt, KantongViewModel.kt
+- **Status**: Tested and passing (SakuReportSynchronizationTest, SakuPocketEditTest, SakuAssetManagementTest)
 
 ## Core Dependencies
 - Compose, AndroidX, Material 3
@@ -40,7 +40,7 @@
 
 ## Key Components Present
 - **Auth Screens**: LoginScreen, RegisterScreen, ForgotPasswordScreen
-- **Core Features**: Dashboard, Kantong (pockets), Transactions, Profile, Reports, Export
+- **Core Features**: Dashboard, Kantong (pockets), Transactions, Profile, Reports (Unified Analytics Hub, Hero Summary), Export
 - **Database**: SakuDatabase with DAOs
 - **Services**: CurrencyConversionService, ReceiptScannerService, ApiKeyConfigService
 - **UI Components**: SakuComponents, ProfileComponents

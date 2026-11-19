@@ -34,6 +34,15 @@ enum class ReportPeriod(val titleIndo: String) {
 }
 
 // ============================================================
+// Chart Tab Enum - Unified Analytics Switcher
+// ============================================================
+enum class ReportChartTab(val title: String) {
+    CASHFLOW("Arus Kas"),
+    CATEGORY("Kategori"),
+    BALANCE_TREND("Tren Saldo")
+}
+
+// ============================================================
 // Data classes for chart rendering
 // ============================================================
 data class CashflowPoint(
@@ -90,6 +99,9 @@ data class ReportUiState(
     val totalTransfer: Double = 0.0,
     val incomeChangePercent: Double = 0.0,    // vs previous period
     val expenseChangePercent: Double = 0.0,   // vs previous period
+    val netChangePercent: Double = 0.0,       // vs previous period
+    // Active chart tab in Unified Analytics Hub
+    val selectedChartTab: ReportChartTab = ReportChartTab.CASHFLOW,
     // Cashflow line chart
     val cashflowPoints: List<CashflowPoint> = emptyList(),
     // Category donut
@@ -105,6 +117,9 @@ data class ReportUiState(
     val isLoading: Boolean = false,
     val hasData: Boolean = false
 ) {
+    val netCashflow: Double
+        get() = totalIncome - totalExpense
+
     val selectedPeriodTitle: String
         get() = when (period) {
             ReportPeriod.CUSTOM -> {
@@ -152,17 +167,20 @@ class ReportViewModel(
     private val _topTransactionFilter = MutableStateFlow(TopTransactionFilter.TOP_5)
     private val _transactionTypeFilter = MutableStateFlow(TransactionTypeFilter.ALL)
     private val _selectedCategory = MutableStateFlow<DonutCategorySegment?>(null)
+    private val _selectedChartTab = MutableStateFlow(ReportChartTab.CASHFLOW)
 
     val topTransactionFilter: StateFlow<TopTransactionFilter> = _topTransactionFilter.asStateFlow()
     val transactionTypeFilter: StateFlow<TransactionTypeFilter> = _transactionTypeFilter.asStateFlow()
     val selectedCategory: StateFlow<DonutCategorySegment?> = _selectedCategory.asStateFlow()
+    val selectedChartTab: StateFlow<ReportChartTab> = _selectedChartTab.asStateFlow()
 
     private data class FilterState(
         val period: ReportPeriod,
         val customStart: Long,
         val customEnd: Long,
         val topFilter: TopTransactionFilter,
-        val typeFilter: TransactionTypeFilter
+        val typeFilter: TransactionTypeFilter,
+        val chartTab: ReportChartTab
     )
 
     private val filterState: Flow<FilterState> = combine(
@@ -170,9 +188,9 @@ class ReportViewModel(
         _customStartMillis,
         _customEndMillis,
         _topTransactionFilter,
-        _transactionTypeFilter
-    ) { period, customStart, customEnd, topFilter, typeFilter ->
-        FilterState(period, customStart, customEnd, topFilter, typeFilter)
+        combine(_transactionTypeFilter, _selectedChartTab) { typeFilter, chartTab -> Pair(typeFilter, chartTab) }
+    ) { period, customStart, customEnd, topFilter, (typeFilter, chartTab) ->
+        FilterState(period, customStart, customEnd, topFilter, typeFilter, chartTab)
     }
 
     // Main UI State - combines all data sources with filter
@@ -188,7 +206,8 @@ class ReportViewModel(
             customStartMillis = filters.customStart,
             customEndMillis = filters.customEnd,
             topFilter = filters.topFilter,
-            typeFilter = filters.typeFilter
+            typeFilter = filters.typeFilter,
+            chartTab = filters.chartTab
         )
     }.stateIn(
         viewModelScope,
@@ -209,6 +228,10 @@ class ReportViewModel(
         _selectedPeriod.value = ReportPeriod.CUSTOM
         _customStartMillis.value = startMillis
         _customEndMillis.value = endMillis
+    }
+
+    fun selectChartTab(tab: ReportChartTab) {
+        _selectedChartTab.value = tab
     }
 
     fun setTopTransactionFilter(filter: TopTransactionFilter) {
@@ -265,7 +288,8 @@ class ReportViewModel(
         customStartMillis: Long,
         customEndMillis: Long,
         topFilter: TopTransactionFilter,
-        typeFilter: TransactionTypeFilter
+        typeFilter: TransactionTypeFilter,
+        chartTab: ReportChartTab
     ): ReportUiState {
 
         val (periodStart, periodEnd, periodTitle) = when (period) {
@@ -372,6 +396,9 @@ class ReportViewModel(
 
         val incomeChangePercent = if (prevIncome > 0.0) ((totalIncome - prevIncome) / prevIncome * 100.0) else 0.0
         val expenseChangePercent = if (prevExpense > 0.0) ((totalExpense - prevExpense) / prevExpense * 100.0) else 0.0
+        val netCashflow = totalIncome - totalExpense
+        val prevNet = prevIncome - prevExpense
+        val netChangePercent = if (prevNet != 0.0) ((netCashflow - prevNet) / kotlin.math.abs(prevNet) * 100.0) else 0.0
 
         // Category breakdown for donut
         val categoryExpenses = mutableMapOf<String, Double>()
@@ -466,6 +493,8 @@ class ReportViewModel(
             totalTransfer = totalTransfer,
             incomeChangePercent = incomeChangePercent,
             expenseChangePercent = expenseChangePercent,
+            netChangePercent = netChangePercent,
+            selectedChartTab = chartTab,
             cashflowPoints = cashflowPoints,
             donutSegments = donutSegments,
             categoryBreakdown = categoryBreakdown,

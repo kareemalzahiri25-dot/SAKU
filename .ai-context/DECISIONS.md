@@ -106,6 +106,24 @@
 - **Decision**: Sealed classes for navigation, Flow types
 - **Rationale**: Compile-time safety, developer experience
 
+## UI/UX Redesign Decisions
+
+### Laporan (Report) Screen Reconstruction
+- **Decision**: Unified 4-section minimalist layout replacing 8 stacked cards:
+  1. Standardized `SakuTopBar` with top-right download `IconButton` using `Icons.Default.Download`.
+  2. Horizontal `PeriodFilterSection` with rounded chip pills.
+  3. Clean `HeroSummaryCard` with net cashflow, surplus/defisit badge, and inflow/outflow breakdown.
+  4. `AnalyticsHubSection` with segmented tab switcher (`Arus Kas`, `Kategori`, `Tren Saldo`) and non-overlapping axis labels.
+  5. Top transactions section with category filter chips and clean dividers; removed bottom green export action card.
+- **Rationale**: Minimalist, clean visual hierarchy eliminating redundant cards and conflicting export controls while keeping reactive ViewModel StateFlow intact.
+
+### Kantong & Aset Screen Reconstruction
+- **Decision**: Replaced duplicate dark green gradient hero card (identical to Dashboard) with distinct contextual light overview cards:
+  - Kantong Tab: `PocketBudgetOverviewCard` focusing on Budget Health (Realisasi vs Target Anggaran, progress bar, active pocket count badge, integrated "+ Buat Kantong" button).
+  - Aset Tab: `AssetLiquidityOverviewCard` focusing on Asset Liquidity (Total Saldo Aset, Terikat Rencana vs Saldo Bebas/Tersedia, integrated "+ Tambah Aset" and "Transfer" buttons).
+  - Synchronous `_uiState` field initialization in `openEditPocketDialog` before launching async allocation loader.
+- **Rationale**: User request to differentiate Kantong hero card from Home/Dashboard page, improving informational relevance for budget vs liquidity while maintaining seamless coroutine flow and full test suite compatibility.
+
 ## Componentization Decision
 
 ### Split Composables

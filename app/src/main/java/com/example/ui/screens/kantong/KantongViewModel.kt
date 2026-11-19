@@ -265,36 +265,48 @@ class KantongViewModel(
         val (type, note) = extractTypeAndNote(pocket.description)
         val stats = pocketStats.value.find { it.pocketId == pocket.id }
         val realization = stats?.realization ?: 0.0
+
+        _uiState.value = _uiState.value.copy(
+            isEditPocketDialogOpen = true,
+            editingPocketId = pocket.id,
+            editingPocketCurrentRealization = realization,
+            editPocketName = pocket.name,
+            editPocketTarget = if (pocket.targetAmount > 0) pocket.targetAmount.toLong().toString() else "",
+            editPocketDescription = note,
+            editPocketType = type,
+            editPocketColorHex = pocket.colorHex,
+            editPocketIcon = pocket.iconName,
+            editingPocketAllocations = emptyList(),
+            editingPocketHadAllocations = false,
+            errorMessage = null
+        )
+
         viewModelScope.launch {
-            val existingAllocs = repository.getPocketAllocationsByPocket(pocket.id)
-                .map { allocs ->
-                    allocs.map { alloc ->
-                        val asset = repository.getAssetById(alloc.assetId)
-                        PocketAllocationUIModel(
-                            id = alloc.id,
-                            assetId = alloc.assetId,
-                            assetName = asset?.name ?: "Unknown",
-                            icon = asset?.iconName ?: "account_balance",
-                            nominalStr = alloc.allocatedAmount.toLong().toString()
-                        )
+            try {
+                val existingAllocs = repository.getPocketAllocationsByPocket(pocket.id)
+                    .map { allocs ->
+                        allocs.map { alloc ->
+                            val asset = repository.getAssetById(alloc.assetId)
+                            PocketAllocationUIModel(
+                                id = alloc.id,
+                                assetId = alloc.assetId,
+                                assetName = asset?.name ?: "Unknown",
+                                icon = asset?.iconName ?: "account_balance",
+                                nominalStr = alloc.allocatedAmount.toLong().toString()
+                            )
+                        }
                     }
-                }
-                .first() ?: emptyList()
-            
-            _uiState.value = _uiState.value.copy(
-                isEditPocketDialogOpen = true,
-                editingPocketId = pocket.id,
-                editingPocketCurrentRealization = realization,
-                editPocketName = pocket.name,
-                editPocketTarget = if (pocket.targetAmount > 0) pocket.targetAmount.toLong().toString() else "",
-                editPocketDescription = note,
-                editPocketType = type,
-                editPocketColorHex = pocket.colorHex,
-                editPocketIcon = pocket.iconName,
-                editingPocketAllocations = existingAllocs,
-                editingPocketHadAllocations = existingAllocs.isNotEmpty(),
-                errorMessage = null
-            )
+                    .first() ?: emptyList()
+
+                _uiState.value = _uiState.value.copy(
+                    editingPocketAllocations = existingAllocs,
+                    editingPocketHadAllocations = existingAllocs.isNotEmpty()
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                // If loading allocations fails, leave default empty allocations
+            }
         }
     }
 
