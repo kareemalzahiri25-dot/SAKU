@@ -122,7 +122,8 @@ fun SakuTopBar(
 @Composable
 fun SakuBottomNavigation(
     currentRoute: String?,
-    onNavigateToRoute: (String) -> Unit
+    onNavigateToRoute: (String) -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val items = listOf(
         BottomNavItem.Dashboard,
@@ -140,7 +141,7 @@ fun SakuBottomNavigation(
     
     // Custom navbar dengan curve notch di tengah
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .shadow(16.dp, RoundedCornerShape(topStart = cornerRadius, topEnd = cornerRadius))
             .height(navbarHeight + notchDepth)
