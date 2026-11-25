@@ -511,23 +511,6 @@ fun TotalBudgetOverviewCard(
                     fontWeight = FontWeight.Normal,
                     color = sakuColors.textSecondary
                 )
-
-                // Percent Badge
-                Box(
-                    modifier = Modifier
-                        .background(sakuColors.pillBg, RoundedCornerShape(11.dp))
-                        .padding(horizontal = 9.dp, vertical = 3.dp)
-                ) {
-                    Text(
-                        text = "${data.percentUsed}% ${strings.usedBudget}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = sakuColors.pillText,
-                        style = TabularStyle,
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -1060,31 +1043,6 @@ fun TotalNetWorthCard(
                     color = if (sakuColors.isDark) Color(0xFFD1FAE5) else Color(0xFF1A5A45),
                     letterSpacing = 0.5.sp
                 )
-
-                // Growth Badge with vector icon (no raw arrow char)
-                Row(
-                    modifier = Modifier
-                        .background(badgeBg, RoundedCornerShape(11.dp))
-                        .padding(horizontal = 9.dp, vertical = 3.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        painter = painterResource(id = SakuIcons.LinkExt),
-                        contentDescription = null,
-                        tint = badgeFg,
-                        modifier = Modifier.size(12.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "${data.monthlyGrowth} ${strings.thisMonthShort}",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = badgeFg,
-                        style = TabularStyle,
-                        maxLines = 1,
-                        softWrap = false
-                    )
-                }
             }
 
             Spacer(modifier = Modifier.height(6.dp))

@@ -1,17 +1,26 @@
 package com.saku.app.ui.transaction
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,15 +34,19 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.FlashOn
 import androidx.compose.material.icons.outlined.Image
 import androidx.compose.material.icons.outlined.NorthEast
 import androidx.compose.material.icons.outlined.SouthWest
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -41,6 +54,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,10 +69,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.core.content.ContextCompat
 import com.saku.app.ui.theme.SakuIcons
+import com.saku.app.util.ImageUtils
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Devices
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -69,6 +89,9 @@ import com.saku.app.data.DefaultDataRepository
 import com.saku.app.data.localization.EnglishStrings
 import com.saku.app.data.localization.LocalAppStrings
 import com.saku.app.data.localization.localizePocketName
+import com.saku.app.data.preference.AppPreferences
+import com.saku.app.data.remote.GeminiReceiptService
+import com.saku.app.data.remote.GeminiResult
 import com.saku.app.ui.main.formatRupiah
 import com.saku.app.ui.theme.LocalSakuColors
 import com.saku.app.ui.theme.SAKUTheme
@@ -98,7 +121,7 @@ fun AddTransactionScreen(
         if (!names.contains("Kebutuhan Pokok")) names.add(0, "Kebutuhan Pokok")
         if (!names.contains("Transportasi")) names.add("Transportasi")
         if (!names.contains("Hiburan")) names.add("Hiburan")
-        names.take(4)
+        names.distinct()
     }
 
     // Manual input states
@@ -110,10 +133,146 @@ fun AddTransactionScreen(
 
     // OCR states
     var ocrPocket by remember { mutableStateOf(availablePocketNames.firstOrNull() ?: "Kebutuhan Pokok") }
-    val ocrAmount = 348500L
+    var ocrAmount by remember { mutableLongStateOf(348500L) }
+    var ocrMerchant by remember { mutableStateOf("Superindo - Grand Mall") }
+    var ocrDate by remember { mutableStateOf("21 Nov 2026, 14:30") }
+    var ocrNotes by remember(isEn) {
+        mutableStateOf(
+            if (isEn) "Weekly Groceries, Meat & Fruits (OCR Scan)"
+            else "Belanja Sayur, Daging & Buah Mingguan (OCR Scan)"
+        )
+    }
+    var ocrCategoryType by remember { mutableStateOf(CategoryType.FOOD) }
+    var isScanningWithGemini by remember { mutableStateOf(false) }
+    var geminiScanError by remember { mutableStateOf<String?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val appPreferences = remember { AppPreferences.getInstance(context) }
+    val savedGeminiApiKey by appPreferences.geminiApiKey.collectAsState()
+    val hasGeminiKey = savedGeminiApiKey.isNotBlank()
+
+    fun analyzeReceiptWithGemini(uri: Uri) {
+        if (isScanningWithGemini) return
+        isScanningWithGemini = true
+        geminiScanError = null
+        scope.launch {
+            when (
+                val result = GeminiReceiptService.scanReceipt(
+                    context = context,
+                    imageUri = uri,
+                    apiKey = savedGeminiApiKey,
+                    availablePockets = availablePocketNames,
+                    isEn = isEn
+                )
+            ) {
+                is GeminiResult.Success -> {
+                    val data = result.data
+                    ocrAmount = data.amount
+                    ocrMerchant = data.merchant
+                    ocrDate = data.date
+                    ocrNotes = data.notes.ifBlank {
+                        if (isEn) "Scanned via Gemini Vision AI" else "Dipindai dengan Gemini Vision AI"
+                    }
+                    ocrCategoryType = data.categoryType
+                    data.suggestedPocket?.let { ocrPocket = it }
+                    snackbarHostState.showSnackbar(
+                        if (isEn) "Receipt analyzed with Gemini AI" else "Struk berhasil dianalisis Gemini AI"
+                    )
+                }
+                is GeminiResult.Error -> {
+                    geminiScanError = result.message
+                    snackbarHostState.showSnackbar(result.message)
+                }
+            }
+            isScanningWithGemini = false
+        }
+    }
+
+    // Camera & gallery photo states (0 = Scan Struk tab, 1 = Manual proof attachment)
+    var pendingCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var capturedReceiptUri by remember { mutableStateOf<Uri?>(null) }
+    var manualProofUri by remember { mutableStateOf<Uri?>(null) }
+    var activeCaptureTarget by remember { mutableIntStateOf(0) }
+    var showManualProofPickerDialog by remember { mutableStateOf(false) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        val uri = pendingCameraUri
+        if (success && uri != null) {
+            if (activeCaptureTarget == 0) {
+                capturedReceiptUri = uri
+                if (ocrEngine == 1) {
+                    analyzeReceiptWithGemini(uri)
+                } else {
+                    scope.launch {
+                        snackbarHostState.showSnackbar(
+                            if (isEn) "Receipt photo captured" else "Foto struk berhasil diambil"
+                        )
+                    }
+                }
+            } else {
+                manualProofUri = uri
+                scope.launch {
+                    snackbarHostState.showSnackbar(
+                        if (isEn) "Transaction proof attached" else "Bukti transaksi berhasil dilampirkan"
+                    )
+                }
+            }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            val uri = ImageUtils.createTempReceiptUri(context)
+            pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            scope.launch {
+                snackbarHostState.showSnackbar(
+                    if (isEn) "Camera permission is required to capture receipts"
+                    else "Izin kamera diperlukan untuk memotret struk"
+                )
+            }
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            if (activeCaptureTarget == 0) {
+                capturedReceiptUri = uri
+                if (ocrEngine == 1) {
+                    analyzeReceiptWithGemini(uri)
+                }
+            } else {
+                manualProofUri = uri
+            }
+        }
+    }
+
+    fun launchSystemCamera(target: Int) {
+        activeCaptureTarget = target
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+        if (hasPermission) {
+            val uri = ImageUtils.createTempReceiptUri(context)
+            pendingCameraUri = uri
+            cameraLauncher.launch(uri)
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    val capturedReceiptBitmap = ImageUtils.rememberUriBitmap(capturedReceiptUri)
+    val manualProofBitmap = ImageUtils.rememberUriBitmap(manualProofUri)
 
     // Scanner animation
     val infiniteTransition = rememberInfiniteTransition(label = "scanner")
@@ -216,7 +375,7 @@ fun AddTransactionScreen(
                         .padding(4.dp),
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    // Tab 0: Pindai Struk (OCR)
+                    // Tab 0: Pindai Struk
                     Box(
                         modifier = Modifier
                             .weight(1f)
@@ -227,7 +386,7 @@ fun AddTransactionScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "${strings.scanReceiptTab} (OCR)",
+                            text = strings.scanReceiptTab,
                             fontSize = 13.sp,
                             fontWeight = if (modeTab == 0) FontWeight.Bold else FontWeight.Medium,
                             color = if (modeTab == 0) sakuColors.chipActiveText else sakuColors.chipInactiveText
@@ -281,29 +440,22 @@ fun AddTransactionScreen(
                                     shape = RoundedCornerShape(9.dp)
                                 )
                                 .clickable { ocrEngine = 0 }
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Bolt,
-                                        contentDescription = null,
-                                        tint = sakuColors.secondary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = if (isEn) "Offline (Local)" else "Offline (Lokal)",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = sakuColors.textDark
-                                    )
-                                }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Outlined.Bolt,
+                                    contentDescription = null,
+                                    tint = sakuColors.secondary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = if (isEn) "No Quota • Fast" else "Tanpa Kuota • Cepat",
-                                    fontSize = 10.sp,
-                                    color = sakuColors.secondary
+                                    text = if (isEn) "Offline (Local)" else "Offline (Lokal)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = sakuColors.textDark
                                 )
                             }
                         }
@@ -319,63 +471,31 @@ fun AddTransactionScreen(
                                     color = if (ocrEngine == 1) sakuColors.primary else Color.Transparent,
                                     shape = RoundedCornerShape(9.dp)
                                 )
-                                .clickable { ocrEngine = 1 }
-                                .padding(vertical = 8.dp),
+                                .clickable {
+                                    ocrEngine = 1
+                                    capturedReceiptUri?.let { uri ->
+                                        analyzeReceiptWithGemini(uri)
+                                    }
+                                }
+                                .padding(vertical = 10.dp),
                             contentAlignment = Alignment.Center
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Icon(
-                                        painter = painterResource(id = SakuIcons.AiGemini),
-                                        contentDescription = null,
-                                        tint = sakuColors.secondary,
-                                        modifier = Modifier.size(15.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = "Gemini AI",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = sakuColors.textDark
-                                    )
-                                }
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(5.dp)
-                                            .background(sakuColors.secondary, CircleShape)
-                                    )
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text(
-                                        text = if (isEn) "Active API Key" else "API Key Aktif",
-                                        fontSize = 10.sp,
-                                        color = sakuColors.secondary
-                                    )
-                                }
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    painter = painterResource(id = SakuIcons.AiGemini),
+                                    contentDescription = null,
+                                    tint = sakuColors.secondary,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = "Gemini AI",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = sakuColors.textDark
+                                )
                             }
                         }
-                    }
-                }
-
-                // Info Tag
-                item {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(sakuColors.trackBg, RoundedCornerShape(10.dp))
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (ocrEngine == 0)
-                                (if (isEn) "Offline Mode: Instant receipt scan without internet" else "Mode Offline: Pindai struk instan tanpa kuota internet")
-                            else
-                                (if (isEn) "Gemini AI Mode: Smart extraction of items & categories via cloud" else "Mode Gemini AI: Ekstraksi pintar item belanja & kategori via cloud"),
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = sakuColors.textDark,
-                            textAlign = TextAlign.Center
-                        )
                     }
                 }
 
@@ -388,9 +508,75 @@ fun AddTransactionScreen(
                             .shadow(3.dp, RoundedCornerShape(20.dp), spotColor = Color(0x33000000))
                             .background(Color(0xFF1E292B), RoundedCornerShape(20.dp))
                             .clip(RoundedCornerShape(20.dp))
+                            .clickable { launchSystemCamera(target = 0) }
                             .padding(16.dp),
                         contentAlignment = Alignment.Center
                     ) {
+                        if (capturedReceiptBitmap != null) {
+                            Image(
+                                bitmap = capturedReceiptBitmap,
+                                contentDescription = if (isEn) "Captured receipt" else "Foto struk",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(14.dp))
+                            )
+                        } else {
+                            // Simulated Receipt in Center (placeholder before taking photo)
+                            Box(
+                                modifier = Modifier
+                                    .width(200.dp)
+                                    .shadow(2.dp, RoundedCornerShape(10.dp))
+                                    .background(Color.White, RoundedCornerShape(10.dp))
+                                    .padding(12.dp)
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Text(
+                                        text = "SUPERINDO",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1F2937)
+                                    )
+                                    Text(
+                                        text = "21 Nov 2026 • 14:30",
+                                        fontSize = 9.sp,
+                                        color = Color(0xFF6B7280)
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE5E7EB)))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Apel Fuji 1kg", fontSize = 9.sp, color = Color(0xFF1F2937))
+                                        Text("Rp 48.500", fontSize = 9.sp, color = Color(0xFF1F2937))
+                                    }
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Daging Sapi Segar", fontSize = 9.sp, color = Color(0xFF1F2937))
+                                        Text("Rp 185.000", fontSize = 9.sp, color = Color(0xFF1F2937))
+                                    }
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("Minyak Goreng 2L", fontSize = 9.sp, color = Color(0xFF1F2937))
+                                        Text("Rp 115.000", fontSize = 9.sp, color = Color(0xFF1F2937))
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE5E7EB)))
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Text("TOTAL BELANJA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF114232))
+                                        Text("Rp 348.500", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF114232))
+                                    }
+                                }
+                            }
+
+                            // Animated Laser Line
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(2.5.dp)
+                                    .offset(y = (laserOffset - 90).dp)
+                                    .background(SakuEmerald)
+                            )
+                        }
+
                         // 4 Targeting Corners
                         Box(modifier = Modifier.fillMaxSize()) {
                             // Top Left Corner
@@ -415,59 +601,34 @@ fun AddTransactionScreen(
                             }
                         }
 
-                        // Simulated Receipt in Center
+                        // Camera Hint Pill at Top
                         Box(
                             modifier = Modifier
-                                .width(200.dp)
-                                .shadow(2.dp, RoundedCornerShape(10.dp))
-                                .background(Color.White, RoundedCornerShape(10.dp))
-                                .padding(12.dp)
+                                .align(Alignment.TopCenter)
+                                .clip(RoundedCornerShape(13.dp))
+                                .background(Color(0xCC142921))
+                                .padding(horizontal = 12.dp, vertical = 5.dp)
                         ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                Text(
-                                    text = "SUPERINDO",
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1F2937)
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CameraAlt,
+                                    contentDescription = null,
+                                    tint = SakuEmerald,
+                                    modifier = Modifier.size(14.dp)
                                 )
+                                Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "21 Nov 2026 • 14:30",
-                                    fontSize = 9.sp,
-                                    color = Color(0xFF6B7280)
+                                    text = if (capturedReceiptBitmap != null) {
+                                        if (isEn) "Tap to Retake" else "Ketuk untuk Foto Ulang"
+                                    } else {
+                                        if (isEn) "Tap to Open Camera" else "Ketuk untuk Buka Kamera"
+                                    },
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White
                                 )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE5E7EB)))
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Apel Fuji 1kg", fontSize = 9.sp, color = Color(0xFF1F2937))
-                                    Text("Rp 48.500", fontSize = 9.sp, color = Color(0xFF1F2937))
-                                }
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Daging Sapi Segar", fontSize = 9.sp, color = Color(0xFF1F2937))
-                                    Text("Rp 185.000", fontSize = 9.sp, color = Color(0xFF1F2937))
-                                }
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("Minyak Goreng 2L", fontSize = 9.sp, color = Color(0xFF1F2937))
-                                    Text("Rp 115.000", fontSize = 9.sp, color = Color(0xFF1F2937))
-                                }
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0xFFE5E7EB)))
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Text("TOTAL BELANJA", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF114232))
-                                    Text("Rp 348.500", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF114232))
-                                }
                             }
                         }
-
-                        // Animated Laser Line
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(2.5.dp)
-                                .offset(y = (laserOffset - 90).dp)
-                                .background(SakuEmerald)
-                        )
 
                         // Buka Galeri Button at Bottom
                         Box(
@@ -476,7 +637,10 @@ fun AddTransactionScreen(
                                 .clip(RoundedCornerShape(13.dp))
                                 .background(Color(0xFF142921))
                                 .clickable {
-                                    scope.launch { snackbarHostState.showSnackbar(if (isEn) "Opening gallery photo picker..." else "Membuka pemilih foto galeri...") }
+                                    activeCaptureTarget = 0
+                                    galleryLauncher.launch(
+                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                    )
                                 }
                                 .padding(horizontal = 14.dp, vertical = 6.dp)
                         ) {
@@ -510,76 +674,199 @@ fun AddTransactionScreen(
                             .padding(18.dp)
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Column {
-                                    Text(
-                                        text = if (isEn) "Detected Amount" else "Nominal Terdeteksi",
-                                        fontSize = 12.sp,
-                                        color = sakuColors.textSecondary
+                            Column {
+                                Text(
+                                    text = if (isEn) "Detected Amount" else "Nominal Terdeteksi",
+                                    fontSize = 12.sp,
+                                    color = sakuColors.textSecondary
+                                )
+                                Text(
+                                    text = formatRupiah(ocrAmount),
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = sakuColors.textDark
+                                )
+                            }
+
+                            // Editable Nominal
+                            Column {
+                                Text(
+                                    text = if (isEn) "Expense Amount (Rp)" else "Nominal Pengeluaran (Rp)",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = sakuColors.textDark
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = if (ocrAmount > 0L) ocrAmount.toString() else "",
+                                    onValueChange = { input ->
+                                        val digits = input.filter { it.isDigit() }
+                                        ocrAmount = digits.toLongOrNull() ?: 0L
+                                    },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    placeholder = {
+                                        Text(
+                                            text = "0",
+                                            fontSize = 13.sp,
+                                            color = sakuColors.textMuted
+                                        )
+                                    },
+                                    prefix = {
+                                        Text(
+                                            text = "Rp ",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = sakuColors.textSecondary
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = sakuColors.inputBg,
+                                        unfocusedContainerColor = sakuColors.inputBg,
+                                        focusedBorderColor = sakuColors.primary,
+                                        unfocusedBorderColor = sakuColors.inputBorder
+                                    )
+                                )
+                            }
+
+                            if (isScanningWithGemini) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(sakuColors.trackBg, RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                ) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(16.dp),
+                                        strokeWidth = 2.dp,
+                                        color = sakuColors.primary
                                     )
                                     Text(
-                                        text = formatRupiah(ocrAmount),
-                                        fontSize = 24.sp,
-                                        fontWeight = FontWeight.Bold,
+                                        text = if (isEn) "Extracting receipt details with Gemini AI..." else "Mengekstrak detail struk dengan Gemini AI...",
+                                        fontSize = 12.sp,
                                         color = sakuColors.textDark
                                     )
                                 }
-
-                                // Engine Status Tag
-                                Box(
+                            } else if (geminiScanError != null && ocrEngine == 1) {
+                                Row(
                                     modifier = Modifier
-                                        .background(sakuColors.trackBg, RoundedCornerShape(11.dp))
-                                        .padding(horizontal = 10.dp, vertical = 4.dp),
-                                    contentAlignment = Alignment.Center
+                                        .fillMaxWidth()
+                                        .background(Color(0xFFFFF5F5), RoundedCornerShape(10.dp))
+                                        .border(1.dp, Color(0xFFFED7D7), RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
                                 ) {
                                     Text(
-                                        text = if (ocrEngine == 0) "⚡ OCR On-Device" else "✨ Gemini Vision",
+                                        text = geminiScanError.orEmpty(),
                                         fontSize = 11.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = sakuColors.primary
+                                        color = SakuExpenseRed,
+                                        modifier = Modifier.weight(1f)
                                     )
+                                    if (capturedReceiptUri != null) {
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = if (isEn) "Retry" else "Coba Lagi",
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = sakuColors.primary,
+                                            modifier = Modifier.clickable {
+                                                capturedReceiptUri?.let { analyzeReceiptWithGemini(it) }
+                                            }
+                                        )
+                                    }
                                 }
                             }
 
                             Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(sakuColors.border))
 
                             // Simpan ke Pos Kantong
+                            PocketSelectorSection(
+                                label = "${strings.selectPocketLabel}:",
+                                pockets = availablePocketNames,
+                                selectedPocket = ocrPocket,
+                                onSelectPocket = { ocrPocket = it },
+                                localizeName = { strings.localizePocketName(it) },
+                                isBoldLabel = false
+                            )
+
+                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(sakuColors.border))
+
+                            // Editable Expense Name / Merchant
                             Column {
                                 Text(
-                                    text = "${strings.selectPocketLabel}:",
+                                    text = if (isEn) "Expense / Merchant Name" else "Nama Pengeluaran / Merchant",
                                     fontSize = 12.sp,
-                                    color = sakuColors.textSecondary
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = sakuColors.textDark
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = ocrMerchant,
+                                    onValueChange = { ocrMerchant = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    placeholder = {
+                                        Text(
+                                            text = if (isEn) "e.g. Lunch / Superindo" else "Contoh: Makan Siang / Superindo",
+                                            fontSize = 13.sp,
+                                            color = sakuColors.textMuted
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = sakuColors.inputBg,
+                                        unfocusedContainerColor = sakuColors.inputBg,
+                                        focusedBorderColor = sakuColors.primary,
+                                        unfocusedBorderColor = sakuColors.inputBorder
+                                    )
+                                )
+                            }
+
+                            // Category Quick Chips
+                            Column {
+                                Text(
+                                    text = if (isEn) "Category" else "Kategori",
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = sakuColors.textDark
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                val categoryOptions = listOf(
+                                    CategoryType.FOOD to (if (isEn) "Food" else "Makan"),
+                                    CategoryType.TRANSPORT to (if (isEn) "Transport" else "Transport"),
+                                    CategoryType.ENTERTAINMENT to (if (isEn) "Leisure" else "Hiburan"),
+                                    CategoryType.GENERAL to (if (isEn) "Bills" else "Tagihan")
+                                )
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                                 ) {
-                                    availablePocketNames.forEach { pkt ->
-                                        val isSelected = ocrPocket == pkt
+                                    categoryOptions.forEach { (catType, catLabel) ->
+                                        val isSelected = ocrCategoryType == catType
                                         Box(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .clip(RoundedCornerShape(15.dp))
-                                                .background(if (isSelected) sakuColors.chipActiveBg else sakuColors.chipInactiveBg)
+                                                .clip(RoundedCornerShape(10.dp))
+                                                .background(if (isSelected) sakuColors.chipActiveBg else sakuColors.trackBg)
                                                 .border(
                                                     1.dp,
                                                     if (isSelected) sakuColors.primary else sakuColors.border,
-                                                    RoundedCornerShape(15.dp)
+                                                    RoundedCornerShape(10.dp)
                                                 )
-                                                .clickable { ocrPocket = pkt }
+                                                .clickable { ocrCategoryType = catType }
                                                 .padding(vertical = 7.dp),
                                             contentAlignment = Alignment.Center
                                         ) {
                                             Text(
-                                                text = strings.localizePocketName(pkt),
+                                                text = catLabel,
                                                 fontSize = 11.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) sakuColors.chipActiveText else sakuColors.chipInactiveText,
+                                                color = if (isSelected) sakuColors.chipActiveText else sakuColors.textDark,
                                                 maxLines = 1
                                             )
                                         }
@@ -587,26 +874,67 @@ fun AddTransactionScreen(
                                 }
                             }
 
-                            Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(sakuColors.border))
-
-                            // Metadata rows
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column {
-                                    Text(if (isEn) "Merchant Name" else "Nama Merchant", fontSize = 11.sp, color = sakuColors.textSecondary)
-                                    Text("Superindo - Grand Mall", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = sakuColors.textDark)
-                                }
-                                Column(horizontalAlignment = Alignment.End) {
-                                    Text(strings.detailTime, fontSize = 11.sp, color = sakuColors.textSecondary)
-                                    Text("21 Nov 2026, 14:30", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = sakuColors.textDark)
-                                }
+                            // Editable Date & Time
+                            Column {
+                                Text(
+                                    text = strings.transactionDateLabel,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = sakuColors.textDark
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = ocrDate,
+                                    onValueChange = { ocrDate = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true,
+                                    placeholder = {
+                                        Text(
+                                            text = if (isEn) "e.g. 21 Nov 2026, 14:30" else "Contoh: 21 Nov 2026, 14:30",
+                                            fontSize = 13.sp,
+                                            color = sakuColors.textMuted
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = sakuColors.inputBg,
+                                        unfocusedContainerColor = sakuColors.inputBg,
+                                        focusedBorderColor = sakuColors.primary,
+                                        unfocusedBorderColor = sakuColors.inputBorder
+                                    )
+                                )
                             }
 
+                            // Editable Transaction Notes
                             Column {
-                                Text(strings.detailNotes, fontSize = 11.sp, color = sakuColors.textSecondary)
-                                Text(if (isEn) "Weekly Groceries, Meat & Fruits" else "Belanja Sayur, Daging & Buah Mingguan", fontSize = 12.sp, color = sakuColors.textSecondary)
+                                Text(
+                                    text = strings.detailNotes,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = sakuColors.textDark
+                                )
+                                Spacer(modifier = Modifier.height(6.dp))
+                                OutlinedTextField(
+                                    value = ocrNotes,
+                                    onValueChange = { ocrNotes = it },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    minLines = 2,
+                                    maxLines = 3,
+                                    placeholder = {
+                                        Text(
+                                            text = if (isEn) "Add transaction notes..." else "Tambahkan catatan transaksi...",
+                                            fontSize = 13.sp,
+                                            color = sakuColors.textMuted
+                                        )
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = sakuColors.inputBg,
+                                        unfocusedContainerColor = sakuColors.inputBg,
+                                        focusedBorderColor = sakuColors.primary,
+                                        unfocusedBorderColor = sakuColors.inputBorder
+                                    )
+                                )
                             }
                         }
                     }
@@ -622,13 +950,13 @@ fun AddTransactionScreen(
                             .background(sakuColors.primary)
                             .clickable {
                                 dataRepository.addTransaction(
-                                    title = "Superindo - Grand Mall",
+                                    title = ocrMerchant,
                                     amount = ocrAmount,
-                                    isExpense = true,
-                                    categoryType = CategoryType.FOOD,
+                                    isExpense = ocrCategoryType != CategoryType.INCOME,
+                                    categoryType = ocrCategoryType,
                                     pocketName = ocrPocket,
-                                    dateText = "21 Nov 2026, 14:30",
-                                    notes = if (isEn) "Weekly Groceries, Meat & Fruits (OCR Scan)" else "Belanja Sayur, Daging & Buah Mingguan (OCR Scan)",
+                                    dateText = ocrDate,
+                                    notes = ocrNotes,
                                     method = if (ocrEngine == 0) "Offline ML Kit OCR" else "Gemini Vision AI"
                                 )
                                 onNavigateBack()
@@ -803,45 +1131,14 @@ fun AddTransactionScreen(
                     ) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             // Pos Kantong Tujuan
-                            Column {
-                                Text(
-                                    text = "${strings.selectPocketLabel}:",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = sakuColors.textDark
-                                )
-                                Spacer(modifier = Modifier.height(6.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                ) {
-                                    availablePocketNames.forEach { pkt ->
-                                        val isSelected = manualPocket == pkt
-                                        Box(
-                                            modifier = Modifier
-                                                .weight(1f)
-                                                .clip(RoundedCornerShape(15.dp))
-                                                .background(if (isSelected) sakuColors.chipActiveBg else sakuColors.chipInactiveBg)
-                                                .border(
-                                                    1.dp,
-                                                    if (isSelected) sakuColors.primary else sakuColors.border,
-                                                    RoundedCornerShape(15.dp)
-                                                )
-                                                .clickable { manualPocket = pkt }
-                                                .padding(vertical = 8.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = strings.localizePocketName(pkt),
-                                                fontSize = 11.sp,
-                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) sakuColors.chipActiveText else sakuColors.chipInactiveText,
-                                                maxLines = 1
-                                            )
-                                        }
-                                    }
-                                }
-                            }
+                            PocketSelectorSection(
+                                label = "${strings.selectPocketLabel}:",
+                                pockets = availablePocketNames,
+                                selectedPocket = manualPocket,
+                                onSelectPocket = { manualPocket = it },
+                                localizeName = { strings.localizePocketName(it) },
+                                isBoldLabel = true
+                            )
 
                             // Tanggal & Waktu
                             Column {
@@ -901,20 +1198,36 @@ fun AddTransactionScreen(
                                     color = sakuColors.textDark
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
+                                if (manualProofBitmap != null) {
+                                    Image(
+                                        bitmap = manualProofBitmap,
+                                        contentDescription = if (isEn) "Transaction proof" else "Bukti transaksi",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(140.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(1.dp, sakuColors.border, RoundedCornerShape(12.dp))
+                                            .clickable { showManualProofPickerDialog = true }
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                }
                                 Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .clip(RoundedCornerShape(12.dp))
                                         .background(sakuColors.surface)
                                         .border(1.dp, sakuColors.border, RoundedCornerShape(12.dp))
-                                        .clickable {
-                                            scope.launch { snackbarHostState.showSnackbar(if (isEn) "Select transaction proof from camera/gallery..." else "Pilih bukti transaksi dari kamera/galeri...") }
-                                        }
+                                        .clickable { showManualProofPickerDialog = true }
                                         .padding(vertical = 12.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = if (isEn) "+ Attach Photo / Payment Receipt" else "+ Lampirkan Foto / Bukti Bayar",
+                                        text = if (manualProofBitmap != null) {
+                                            if (isEn) "Change Photo / Payment Receipt" else "Ganti Foto / Bukti Bayar"
+                                        } else {
+                                            if (isEn) "+ Attach Photo / Payment Receipt" else "+ Lampirkan Foto / Bukti Bayar"
+                                        },
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Medium,
                                         color = sakuColors.textSecondary
@@ -976,6 +1289,110 @@ fun AddTransactionScreen(
 
             item {
                 Spacer(modifier = Modifier.height(20.dp))
+            }
+        }
+    }
+
+    if (showManualProofPickerDialog) {
+        AlertDialog(
+            onDismissRequest = { showManualProofPickerDialog = false },
+            title = {
+                Text(
+                    text = if (isEn) "Attach Transaction Proof" else "Lampirkan Bukti Transaksi",
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (isEn) "Choose how to add the receipt or payment proof photo."
+                    else "Pilih sumber foto untuk melampirkan bukti pembayaran."
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showManualProofPickerDialog = false
+                        launchSystemCamera(target = 1)
+                    }
+                ) {
+                    Text(if (isEn) "Camera" else "Kamera")
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        showManualProofPickerDialog = false
+                        activeCaptureTarget = 1
+                        galleryLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
+                ) {
+                    Text(if (isEn) "Gallery" else "Galeri")
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PocketSelectorSection(
+    label: String,
+    pockets: List<String>,
+    selectedPocket: String,
+    onSelectPocket: (String) -> Unit,
+    localizeName: (String) -> String,
+    isBoldLabel: Boolean
+) {
+    val sakuColors = LocalSakuColors.current
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = label,
+            fontSize = if (isBoldLabel) 13.sp else 12.sp,
+            fontWeight = if (isBoldLabel) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (isBoldLabel) sakuColors.textDark else sakuColors.textSecondary
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        FlowRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            pockets.forEach { pkt ->
+                val isSelected = selectedPocket == pkt
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(if (isSelected) sakuColors.chipActiveBg else sakuColors.chipInactiveBg)
+                        .border(
+                            width = if (isSelected) 1.5.dp else 1.dp,
+                            color = if (isSelected) sakuColors.primary else sakuColors.border,
+                            shape = RoundedCornerShape(14.dp)
+                        )
+                        .clickable { onSelectPocket(pkt) }
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Outlined.Check,
+                            contentDescription = null,
+                            tint = sakuColors.chipActiveText,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                    Text(
+                        text = localizeName(pkt),
+                        fontSize = 12.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) sakuColors.chipActiveText else sakuColors.chipInactiveText,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }

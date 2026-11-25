@@ -58,6 +58,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -72,6 +73,8 @@ import com.saku.app.data.DefaultDataRepository
 import com.saku.app.data.localization.EnglishStrings
 import com.saku.app.data.localization.LocalAppStrings
 import com.saku.app.data.preference.AppPreferences
+import com.saku.app.data.remote.GeminiReceiptService
+import com.saku.app.data.remote.GeminiResult
 import com.saku.app.ui.theme.LocalSakuColors
 import androidx.compose.ui.res.painterResource
 import com.saku.app.ui.theme.SakuIcons
@@ -91,6 +94,7 @@ fun EditProfileAndApiScreen(
     val strings = LocalAppStrings.current
     val isEn = strings == EnglishStrings
     val context = LocalContext.current
+    val clipboardManager = LocalClipboardManager.current
     val appPreferences = remember { AppPreferences.getInstance(context) }
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -122,7 +126,16 @@ fun EditProfileAndApiScreen(
     }
 
     var isApiKeyVisible by remember { mutableStateOf(false) }
-    var apiStatus by remember(isEn) { mutableStateOf(if (isEn) "Connected & Active" else "Terhubung & Aktif") }
+    var isApiVerified by remember(savedApiKey) { mutableStateOf(savedApiKey.isNotBlank()) }
+    var apiStatus by remember(isEn, savedApiKey) {
+        mutableStateOf(
+            if (savedApiKey.isNotBlank()) {
+                if (isEn) "Saved (Tap Test to verify)" else "Tersimpan (Ketuk Cek untuk uji)"
+            } else {
+                if (isEn) "Not Connected" else "Belum Terhubung"
+            }
+        )
+    }
     var isTestingApi by remember { mutableStateOf(false) }
 
     val initials = remember(fullName) {
@@ -484,13 +497,25 @@ fun EditProfileAndApiScreen(
                                         .weight(1.3f)
                                         .height(38.dp)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .clickable {
+                                        .clickable(enabled = !isTestingApi) {
                                             isTestingApi = true
                                             scope.launch {
-                                                kotlinx.coroutines.delay(600)
+                                                when (val res = GeminiReceiptService.verifyApiKey(apiKey, isEn)) {
+                                                    is GeminiResult.Success -> {
+                                                        isApiVerified = true
+                                                        apiStatus = if (isEn) "Connected & Verified" else "Terhubung & Terverifikasi"
+                                                        snackbarHostState.showSnackbar(
+                                                            if (isEn) "Gemini API connection successfully verified!"
+                                                            else "Koneksi API Gemini berhasil diverifikasi!"
+                                                        )
+                                                    }
+                                                    is GeminiResult.Error -> {
+                                                        isApiVerified = false
+                                                        apiStatus = res.message
+                                                        snackbarHostState.showSnackbar(res.message)
+                                                    }
+                                                }
                                                 isTestingApi = false
-                                                apiStatus = if (isEn) "Connected & Active" else "Terhubung & Aktif"
-                                                snackbarHostState.showSnackbar(if (isEn) "Gemini API connection successfully verified!" else "Koneksi API Gemini berhasil diverifikasi!")
                                             }
                                         },
                                     color = sakuColors.trackBg,
@@ -525,9 +550,18 @@ fun EditProfileAndApiScreen(
                                         .height(38.dp)
                                         .clip(RoundedCornerShape(8.dp))
                                         .clickable {
-                                            apiKey = "AIzaSyD-newPastedKeyExample98471"
-                                            scope.launch {
-                                                snackbarHostState.showSnackbar(if (isEn) "API Key pasted successfully" else "API Key berhasil ditempel")
+                                            val clipText = clipboardManager.getText()?.text?.trim().orEmpty()
+                                            if (clipText.isNotBlank()) {
+                                                apiKey = clipText
+                                                isApiVerified = true
+                                                apiStatus = if (isEn) "Saved (Tap Test to verify)" else "Tersimpan (Ketuk Cek untuk uji)"
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(if (isEn) "API Key pasted from clipboard" else "API Key berhasil ditempel dari clipboard")
+                                                }
+                                            } else {
+                                                scope.launch {
+                                                    snackbarHostState.showSnackbar(if (isEn) "Clipboard is empty" else "Clipboard kosong")
+                                                }
                                             }
                                         },
                                     color = sakuColors.surface,
@@ -595,14 +629,15 @@ fun EditProfileAndApiScreen(
                             }
 
                             // API Status Box
+                            val isStatusPositive = apiKey.isNotBlank() && isApiVerified
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(10.dp))
-                                    .background(if (apiKey.isNotEmpty()) Color(0xFFF0FDF4) else Color(0xFFFFF7ED))
+                                    .background(if (isStatusPositive) Color(0xFFF0FDF4) else Color(0xFFFFF7ED))
                                     .border(
                                         1.dp,
-                                        if (apiKey.isNotEmpty()) Color(0xFFBBF7D0) else Color(0xFFFED7AA),
+                                        if (isStatusPositive) Color(0xFFBBF7D0) else Color(0xFFFED7AA),
                                         RoundedCornerShape(10.dp)
                                     )
                                     .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -612,7 +647,7 @@ fun EditProfileAndApiScreen(
                                     modifier = Modifier
                                         .size(8.dp)
                                         .clip(CircleShape)
-                                        .background(if (apiKey.isNotEmpty()) SakuEmerald else Color(0xFFF97316))
+                                        .background(if (isStatusPositive) SakuEmerald else Color(0xFFF97316))
                                 )
 
                                 Spacer(modifier = Modifier.width(8.dp))
@@ -621,7 +656,7 @@ fun EditProfileAndApiScreen(
                                     text = "${if (isEn) "Status" else "Status"}: $apiStatus",
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (apiKey.isNotEmpty()) Color(0xFF166534) else Color(0xFF9A3412)
+                                    color = if (isStatusPositive) Color(0xFF166534) else Color(0xFF9A3412)
                                 )
                             }
                         }
@@ -640,7 +675,7 @@ fun EditProfileAndApiScreen(
                     Button(
                         onClick = {
                             scope.launch {
-                                appPreferences.setUserProfile(fullName, email, apiKey)
+                                appPreferences.setUserProfile(fullName, email, apiKey.trim())
                                 dataRepository.updateUserName(fullName)
                                 snackbarHostState.showSnackbar(strings.profileUpdatedSuccess)
                                 kotlinx.coroutines.delay(300)
