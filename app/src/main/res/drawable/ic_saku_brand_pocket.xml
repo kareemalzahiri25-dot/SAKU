@@ -1,0 +1,25 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <!-- SAKU Brand Origami Pocket Emblem -->
+    <!-- Base Pocket Body -->
+    <path
+        android:fillColor="#FF114232"
+        android:pathData="M10,14 C10,11.8 11.8,10 14,10 L34,10 C36.2,10 38,11.8 38,14 L38,36 C38,39.3 35.3,42 32,42 L16,42 C12.7,42 10,39.3 10,36 Z" />
+    <!-- Emerald Origami Flap -->
+    <path
+        android:fillColor="#FF10B981"
+        android:pathData="M10,14 L22.5,23.5 C23.4,24.2 24.6,24.2 25.5,23.5 L38,14 L38,18 L25.5,27.5 C24.6,28.2 23.4,28.2 22.5,27.5 L10,18 Z" />
+    <!-- Gold / Mint Accent Notch -->
+    <path
+        android:fillColor="#FFEAF3EF"
+        android:pathData="M18,10 L18,7 C18,5.9 18.9,5 20,5 L28,5 C29.1,5 30,5.9 30,7 L30,10 Z" />
+    <path
+        android:strokeColor="#FF34D399"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000"
+        android:pathData="M22,7.5 L26,7.5" />
+</vector>

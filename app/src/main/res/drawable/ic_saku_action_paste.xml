@@ -1,0 +1,35 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- SAKU Custom Action Paste Clipboard -->
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M16,4 L19,4 C19.6,4 20,4.4 20,5 L20,20 C20,20.6 19.6,21 19,21 L5,21 C4.4,21 4,20.6 4,20 L4,5 C4,4.4 4.4,4 5,4 L8,4" />
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M9,3 C9,2.4 9.4,2 10,2 L14,2 C14.6,2 15,2.4 15,3 L15,5 C15,5.6 14.6,6 14,6 L10,6 C9.4,6 9,5.6 9,5 Z" />
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M8,11 L16,11" />
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M8,15 L13,15" />
+</vector>

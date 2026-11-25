@@ -1,0 +1,49 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- SAKU Custom Financial Analytics & Growth Chart -->
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M3,20.5 L21,20.5" />
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M6.5,20.5 L6.5,14" />
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M12,20.5 L12,9" />
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M17.5,20.5 L17.5,4" />
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M6.5,11.5 L10.5,6.5 L13.5,9.5 L18.5,4" />
+    <path
+        android:strokeColor="#FF114232"
+        android:strokeWidth="1.75"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:fillColor="#00000000"
+        android:pathData="M15.5,4 L18.5,4 L18.5,7" />
+</vector>
